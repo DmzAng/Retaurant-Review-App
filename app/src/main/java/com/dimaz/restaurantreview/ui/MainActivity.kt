@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
@@ -15,6 +16,7 @@ import com.dimaz.restaurantreview.data.response.Restaurant
 import com.dimaz.restaurantreview.data.response.RestaurantResponse
 import com.dimaz.restaurantreview.data.retrofit.ApiConfig
 import com.dimaz.restaurantreview.databinding.ActivityMainBinding
+import com.google.android.material.snackbar.Snackbar
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.Callback
@@ -33,69 +35,38 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        val mainViewModel = ViewModelProvider(this, ViewModelProvider.NewInstanceFactory()).get(MainViewModel::class.java)
+        mainViewModel.restaurant.observe(this) { restaurant ->
+            setRestaurantData(restaurant)
+        }
+        mainViewModel.listReview.observe(this) { consumerReviews ->
+            setReviewData(consumerReviews)
+        }
+        mainViewModel.isLoading.observe(this) {
+            showLoading(it)
+        }
+
         supportActionBar?.hide()
         val layoutManager = LinearLayoutManager(this)
         binding.rvReview.layoutManager = layoutManager
         val itemDecoration = DividerItemDecoration(this, layoutManager.orientation)
         binding.rvReview.addItemDecoration(itemDecoration)
 
+        mainViewModel.snackbarText.observe(this, {
+            it.getContentIfNotHandled()?.let { snackBarText ->
+                Snackbar.make(
+                    window.decorView.rootView,
+                    snackBarText,
+                    Snackbar.LENGTH_SHORT
+                ).show()
+            }
+        })
+
         binding.btnSend.setOnClickListener { view ->
-            postReview(binding.edReview.text.toString())
+            mainViewModel.postReview(binding.edReview.text.toString())
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.hideSoftInputFromWindow(view.windowToken, 0)
         }
-
-        findRestaurant()
-    }
-
-    private fun postReview(review: String) {
-        showLoading(true)
-        val client = ApiConfig.getApiService().postReview(RESTAURANT_ID, "Dicoding", review)
-        client.enqueue(object : Callback<PostReviewResponse> {
-            override fun onResponse(
-                call: Call<PostReviewResponse>,
-                response: Response<PostReviewResponse>
-            ) {
-                showLoading(false)
-                val responseBody = response.body()
-                if (response.isSuccessful && responseBody != null) {
-                    setReviewData(responseBody.customerReviews)
-                } else {
-                    Log.e(TAG, "onFailure: ${response.message()}")
-                }
-            }
-            override fun onFailure(call: Call<PostReviewResponse>, t: Throwable) {
-                showLoading(false)
-                Log.e(TAG, "onFailure: ${t.message}")
-            }
-        })
-    }
-
-    private fun findRestaurant() {
-        showLoading(true)
-        val client = ApiConfig.getApiService().getRestaurant(RESTAURANT_ID)
-        client.enqueue(object : Callback<RestaurantResponse> {
-            override fun onResponse(
-                call: Call<RestaurantResponse>,
-                response: Response<RestaurantResponse>
-            ){
-                showLoading(false)
-                if (response.isSuccessful) {
-                    val responseBody = response.body()
-                    if (responseBody != null) {
-                        setRestaurantData(responseBody.restaurant)
-                        setReviewData(responseBody.restaurant.customerReviews)
-                    }
-                    else {
-                        Log.e(TAG, "onFailure: ${response.message()}")
-                    }
-                }
-            }
-            override fun onFailure(call: Call<RestaurantResponse>, t: Throwable) {
-                showLoading(false)
-                Log.e(TAG, "onFailure: ${t.message}")
-            }
-        })
     }
 
     private fun setReviewData(customerReviews: List<CustomerReviewsItem>) {
