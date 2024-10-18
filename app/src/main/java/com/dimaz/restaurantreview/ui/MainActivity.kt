@@ -49,7 +49,8 @@ class MainActivity : AppCompatActivity() {
                     Snackbar.LENGTH_SHORT
                 ).show()
             }
-        })
+        }
+        )
 
         binding.btnSend.setOnClickListener { view ->
             mainViewModel.postReview(binding.edReview.text.toString())
